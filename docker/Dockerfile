@@ -1,0 +1,42 @@
+FROM ubuntu:jammy as base
+
+RUN apt-get update -y && apt-get upgrade -y
+RUN apt-get install -y --no-install-recommends build-essential ca-certificates cmake gcc-12 g++-12 gdb git ninja-build
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 10
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 20
+
+RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10
+RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 20
+
+FROM base as fmt
+
+RUN mkdir /src && \
+    cd /src && \
+    git clone -b 9.1.0 https://github.com/fmtlib/fmt.git && \
+    cd fmt && \
+    mkdir build && \
+    cd build && \
+    cmake -G Ninja -DFMT_DOC=Off -DFMT_TEST=Off -DCMAKE_BUILD_TYPE=RelWithDebInfo .. && \
+    ninja -j $(nproc) && \
+    ninja install
+
+FROM base as gtest
+
+RUN mkdir /src && \
+    cd /src && \
+    git clone -b release-1.12.1 https://github.com/google/googletest.git && \
+    cd googletest && \
+    mkdir build && \
+    cd build && \
+    cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo .. && \
+    ninja -j $(nproc) && \
+    ninja install
+
+FROM base as final
+
+COPY --from=fmt /src /src
+COPY --from=fmt /usr/local /usr/local
+
+COPY --from=gtest /src /src
+COPY --from=gtest /usr/local /usr/local
